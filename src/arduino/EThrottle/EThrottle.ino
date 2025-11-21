@@ -114,7 +114,7 @@ throttleLoop(
     throttle.setIdleAddFactor(
       healthMonitor.getStatus().bits.ecuRtDataOkay ? ecu::idleDuty : 0u);
   }
-  throttle.run();
+  throttle.run(dt_usec);
 }
 
 void

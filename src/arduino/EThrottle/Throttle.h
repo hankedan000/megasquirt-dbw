@@ -17,6 +17,8 @@ public:
   static constexpr uint8_t DEFAULT_PID_PERIOD_MS = 10u;
   static constexpr uint8_t MAX_IDLE_ADDER_AUTHORITY = 20u;
   static constexpr uint16_t MAX_TPS = 10000u;
+  static constexpr float MAX_V = 80.0f; // max trajectory velocity (80%/sec)
+  static constexpr float MAX_A = 400.0f;// max trajectory acceleration (400%/sec)
 
   enum struct SetpointSource
   {
@@ -30,6 +32,20 @@ public:
     Driver = 'd',
     PPS = 'p',
     TPS = 't',
+  };
+
+  // trajectory state
+  struct TrajState
+  {
+    // current tps trajectory position (%)
+    // range: [0 to 10000] (ie. 0% to 100%)
+    uint16_t pos = 0u;
+    // current tps trajectory velocity (%/sec)
+    // range: [-MAX_V to +MAX_V]
+    float vel = 0.0f;
+    // current tps trajectory acceleration (%/sec^s)
+    // range: [-MAX_A to +MAX_A]
+    float acc = 0.0f;
   };
 
 public:
@@ -123,7 +139,8 @@ public:
    * routine.
    */
   void
-  run();
+  run(
+    const uint16_t dt_usec);
 
   // pushes the PID coefficients into the controller
   void
@@ -161,10 +178,17 @@ private:
   doPedal();
 
   void
-  doThrottle();
+  doThrottle(
+    const uint16_t dt_usec);
 
   void
   doMotorCurrent();
+
+  void
+  trajUpdate(
+    TrajState    & t,
+    const float    dt_sec,
+    const uint16_t targetTPS);
 
 private:
     const uint8_t driverPinP_;
@@ -298,6 +322,7 @@ private:
     uint8_t driverFaultCount_ = 0u;
     uint16_t prevTPS_ = 0u;
     int16_t TPSdot_ = 0u;
+    TrajState trajState_ = {};
 
 };
 

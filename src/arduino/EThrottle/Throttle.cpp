@@ -246,10 +246,11 @@ Throttle::clearFault(
 }
 
 void
-Throttle::run()
+Throttle::run(
+  const uint16_t dt_usec)
 {
   doPedal();
-  doThrottle();
+  doThrottle(dt_usec);
   doMotorCurrent();
 
   DEBUG("driverFB: %4d; motorCurrent: %4d mA", driverFB_, motorCurrent_mA_);
@@ -408,7 +409,8 @@ Throttle::doPedal()
 }
 
 void
-Throttle::doThrottle()
+Throttle::doThrottle(
+  const uint16_t dt_usec)
 {
   tpsA_ = adc::tpsA.value;
   tpsB_ = adc::tpsB.value;
@@ -478,6 +480,13 @@ Throttle::doThrottle()
         break;
     }
 
+    constexpr bool USE_TRAJECTORY_ALGORITHM = true;
+    if (USE_TRAJECTORY_ALGORITHM)
+    {
+      trajUpdate(trajState_, dt_usec * 1.0e-6, tpsTarget_);
+      tpsTarget_ = trajState_.pos;
+    }
+
     // clamp the tpsTarget_ within tpsStall_ and 100%
     constexpr auto TPS_110 = MAX_TPS + (MAX_TPS / 10u);// 110% in tps units
     if (tpsTarget_ > TPS_110)
@@ -489,7 +498,7 @@ Throttle::doThrottle()
     {
       tpsTarget_ = MAX_TPS;
     }
-
+    
     pidSetpoint_ = static_cast<double>(tpsTarget_);
     pidIn_ = static_cast<double>(tps_);
     newCycle = pid_.Compute();
@@ -627,6 +636,53 @@ Throttle::doMotorCurrent()
     // apply smoothing
     smoothU16(motorCurrent_mA_, motorCurrentNow, 10u);
   }
+}
+
+void
+Throttle::trajUpdate(
+    TrajState    & t,
+    const float    dt_sec,
+    const uint16_t targetTPS)
+{
+  const int16_t posErr = static_cast<int16_t>(targetTPS) - static_cast<int16_t>(t.pos);
+  constexpr auto TENTH_OF_PERCENT = static_cast<int16_t>(MAX_TPS / 100 / 10);// 0.1% in TPS
+  constexpr auto HALF_OF_PERCENT  = static_cast<int16_t>(MAX_TPS / 100 / 2 );// 0.5% in TPS
+
+  // --- 1) Decide desired velocity direction toward target ---
+  float targetVel = 0.0f;
+  if (abs(posErr) > TENTH_OF_PERCENT)
+  {
+    targetVel = (posErr > 0 ? MAX_V : -MAX_V);
+  }
+
+  // --- 2) Acceleration limit the velocity change ---
+  float dv = targetVel - t.vel;
+  const float dvMax = MAX_A * dt_sec;
+  if (dv > dvMax)
+  {
+    dv = dvMax;
+  }
+  else if (dv < -dvMax)
+  {
+    dv = -dvMax;
+  }
+
+  t.vel += dv;          // new limited velocity
+  t.acc  = dv / dt_sec; // actual used acceleration
+
+  // --- 3) Integrate position ---
+  t.pos += static_cast<uint16_t>(t.vel * dt_sec * 100.0f);
+
+  // --- 4) Snap to target if close and slowing down ---
+  // prevents oscillation around the target
+  if (abs(posErr) < HALF_OF_PERCENT && fabsf(t.vel) < 1.0f)
+  {
+    t.pos = targetTPS;
+    t.vel = 0.0f;
+    t.acc = 0.0f;
+  }
+
+  // INFO("posErr=%5d;pos=%5d;vel=%d;acc=%d", posErr, t.pos, (uint16_t)t.vel, (uint16_t)t.acc);
 }
 
 void
