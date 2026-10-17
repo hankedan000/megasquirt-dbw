@@ -28,20 +28,23 @@ Please also read the **[Safety & Liability Disclaimer](#%EF%B8%8F-safety--liabil
 - Cruise control functionality
 - Support throttle "blip" requests (e.g. for automatic/sequential transmissions)
 
-## Building The Arduino Project
-This repo uses **git submodules** for library dependencies. Arduino IDE **1.6+** is required.
+## Building The Firmware
+The firmware is a [PlatformIO](https://platformio.org/) project located in [/src/arduino/EThrottle/](/src/arduino/EThrottle/). Library dependencies are declared in its [platformio.ini](/src/arduino/EThrottle/platformio.ini) and downloaded automatically by PlatformIO.
 
-1. Clone the repo
+1. Install PlatformIO (either the [VS Code extension](https://platformio.org/install/ide?install=vscode) or [PlatformIO Core](https://docs.platformio.org/en/latest/core/installation/index.html))
 
-2. Update the submodules
-`git submodule update --init --recursive`
+2. Build the firmware
+`pio run -d src/arduino/EThrottle`
 
-3. In Arduino IDE go to `File > Preference` and set the Arduino IDE sketchbook location to:
-`<path_to_this_repo>/src/arduino/`
+3. Flash the firmware to the Arduino Nano
+`pio run -d src/arduino/EThrottle -t upload`
 
-4. Open the project through: `File > Sketchbook > EThrottle`
+When using VS Code, open the `src/arduino/EThrottle/` folder as a PlatformIO project.
 
-All required libraries will be available under `src/arduino/libraries/`.
+### Unit Tests
+Hardware independent code is unit tested on the host using PlatformIO's `native` platform (requires a host `gcc`/`g++`). Tests live in [/src/arduino/EThrottle/test/](/src/arduino/EThrottle/test/).
+
+`pio test -d src/arduino/EThrottle -e native`
 
 ## Printed Circuit Board
 The project files for the PCB are located in [/src/pcb/](/src/pcb/). They can be opened with [EasyEDA Pro](https://easyeda.com/). __Note that they will not open with EasyEDA Standard version__ (might convert them to std version later).
